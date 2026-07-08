@@ -105,9 +105,20 @@ impl<T> SharedBox<T> {
             return Err(reference);
         }
 
-        self.borrow_count -= 1;
-        let _ = core::mem::ManuallyDrop::new(reference);
-        Ok(())
+        if size_of::<T>() == 0 {
+            // ZST types can have multiple allocations to the same address, so we need to check for overflow.
+            if let Some(new_count) = self.borrow_count.checked_sub(1) {
+                self.borrow_count = new_count;
+                let _ = core::mem::ManuallyDrop::new(reference);
+                Ok(())
+            } else {
+                Err(reference)
+            }
+        } else {
+            self.borrow_count -= 1;
+            let _ = core::mem::ManuallyDrop::new(reference);
+            Ok(())
+        }
     }
 
     /// Try to convert `Self` into a `Box` if all borrowed `SharedBoxRef` has been given back.
@@ -242,5 +253,28 @@ impl<T> Drop for SharedBoxRef<T> {
 
             panic!("SharedBoxRef should not be dropped. Use SharedBox::try_return to consume it.");
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn zst() {
+        let mut b1 = SharedBox::new(());
+        let mut b2 = SharedBox::new(());
+
+        let r11 = b1.borrow();
+        let r12 = b1.borrow();
+
+        let r2 = b2.borrow();
+
+        b1.try_return(r2).unwrap();
+
+        b1.try_return(r11).unwrap();
+        let r12 = b1.try_return(r12).unwrap_err();
+
+        b2.try_return(r12).unwrap();
     }
 }

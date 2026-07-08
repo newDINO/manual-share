@@ -37,6 +37,31 @@
 //! - **`do-not-panic-when-panicking`** (_enabled by default_)
 //!   Prevent panic-on-drop when the thread is already panicking.
 //!   This can prevent too much unrelated information being printed out when the thread is panicking due to other reasons.
+//!
+//!
+//! # Special ZST handling
+//! ZST (Zero-Sized Types) are types that have no size, such as `()` or `struct {}`.
+//! ZST allocated on heap can have the same address,
+//! so the ptr equallity check of returning methods such as [`SharedBox::try_return`]
+//! can't tell whether the [`SharedBoxRef`] has the same origin,
+//! allowing [`SharedBoxRef`] created by one [`SharedBox`] to be returned to a different [`SharedBox`].
+//!
+//! This is totally fine in the sense that ZST has no data and do points to the same address.
+//! However, this allows returning more [`SharedBoxRef`] than what the original [`SharedBox`] has created,
+//! which will underflow the borrow count.
+//!
+//! So an underflow check is added for ZST,
+//! giving back more [`SharedBoxRef`] will return an `Err` containing the [`SharedBoxRef`].
+//!
+//! User should be aware of the two difference of ZST compared to non-ZSTs:
+//! 1. [`SharedBoxRef`] created by one [`SharedBox`] can be returned to a different [`SharedBox`],
+//!    which is not allowed for non-ZSTs.
+//! 2. Giving back more [`SharedBoxRef`] than what the original [`SharedBox`] has created will return an `Err` containing the [`SharedBoxRef`].
+//!
+//! The above behavior is also applied to [`SharedVec`] and [`SharedVecMut`].
+//!
+//! The above model for handling ZST originated from discussions in
+//! [a post in Rust user forum](https://users.rust-lang.org/t/built-a-crate-to-safely-share-box-and-vec-manually/141138/5).
 
 pub mod shared_box;
 pub mod shared_vec;

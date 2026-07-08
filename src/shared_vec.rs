@@ -116,9 +116,20 @@ impl<T> SharedVec<T> {
             return Err(reference);
         }
 
-        self.borrow_count -= 1;
-        let _ = core::mem::ManuallyDrop::new(reference);
-        Ok(())
+        if size_of::<T>() == 0 {
+            // ZST types can have multiple allocations to the same address, so we need to check for overflow.
+            if let Some(new_count) = self.borrow_count.checked_sub(1) {
+                self.borrow_count = new_count;
+                let _ = core::mem::ManuallyDrop::new(reference);
+                Ok(())
+            } else {
+                Err(reference)
+            }
+        } else {
+            self.borrow_count -= 1;
+            let _ = core::mem::ManuallyDrop::new(reference);
+            Ok(())
+        }
     }
     /// Try to convert `Self` into a `Vec` once all borrowed references are returned.
     ///
@@ -381,12 +392,9 @@ impl<T> SharedVecMut<T> {
             return Err(part);
         }
 
-        self.borrow_count -= 1;
         self.len += part.len;
 
-        let _ = core::mem::ManuallyDrop::new(part);
-
-        Ok(())
+        self.consume_part(part)
     }
     /// Try to unsplit a part that was previously split off with `split_to`.
     pub fn try_unsplit_to(&mut self, part: SharedVecPart<T>) -> Result<(), SharedVecPart<T>> {
@@ -397,13 +405,26 @@ impl<T> SharedVecMut<T> {
             return Err(part);
         }
 
-        self.borrow_count -= 1;
         self.start = part.start;
         self.len += part.len;
 
-        let _ = core::mem::ManuallyDrop::new(part);
-
-        Ok(())
+        self.consume_part(part)
+    }
+    fn consume_part(&mut self, part: SharedVecPart<T>) -> Result<(), SharedVecPart<T>> {
+        if size_of::<T>() == 0 {
+            // ZST types can have multiple allocations to the same address, so we need to check for overflow.
+            if let Some(new_count) = self.borrow_count.checked_sub(1) {
+                self.borrow_count = new_count;
+                let _ = core::mem::ManuallyDrop::new(part);
+                Ok(())
+            } else {
+                Err(part)
+            }
+        } else {
+            self.borrow_count -= 1;
+            let _ = core::mem::ManuallyDrop::new(part);
+            Ok(())
+        }
     }
     /// Try to convert the mutable view back into a `Vec` when no parts remain outstanding.
     pub fn try_into_vec(self) -> Result<Vec<T>, Self> {
@@ -542,3 +563,44 @@ impl<T> Drop for SharedVecPart<T> {
 
 unsafe impl<T: Send> Send for SharedVecPart<T> {}
 unsafe impl<T: Sync> Sync for SharedVecPart<T> {}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn zst() {
+        let mut b1: SharedVec<()> = SharedVec::from_vec(Vec::new());
+        let mut b2: SharedVec<()> = SharedVec::from_vec(Vec::new());
+
+        let r11 = b1.borrow();
+        let r12 = b1.borrow();
+
+        let r2 = b2.borrow();
+
+        b1.try_return(r2).unwrap();
+
+        b1.try_return(r11).unwrap();
+        let r12 = b1.try_return(r12).unwrap_err();
+
+        b2.try_return(r12).unwrap();
+    }
+
+    #[test]
+    fn mut_zst() {
+        let mut b1: SharedVecMut<()> = SharedVecMut::from_vec(Vec::new());
+        let mut b2: SharedVecMut<()> = SharedVecMut::from_vec(Vec::new());
+
+        let r11 = b1.split_off(0).unwrap();
+        let r12 = b1.split_off(0).unwrap();
+
+        let r2 = b2.split_off(0).unwrap();
+
+        b1.try_unsplit_off(r2).unwrap();
+
+        b1.try_unsplit_off(r11).unwrap();
+        let r12 = b1.try_unsplit_off(r12).unwrap_err();
+
+        b2.try_unsplit_off(r12).unwrap();
+    }
+}

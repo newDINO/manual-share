@@ -248,7 +248,7 @@ impl<T> Drop for SharedVecRef<T> {
     }
 }
 
-unsafe impl<T: Sync> Send for SharedVecRef<T> {}
+unsafe impl<T: Sync + Send> Send for SharedVecRef<T> {}
 unsafe impl<T: Sync> Sync for SharedVecRef<T> {}
 
 /// A container of a `Vec` allocation that can be split into multiple `SharedVecPart` values.

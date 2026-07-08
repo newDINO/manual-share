@@ -151,6 +151,7 @@ impl<T> SharedVec<T> {
 }
 
 unsafe impl<T: Send> Send for SharedVec<T> {}
+unsafe impl<T: Sync> Sync for SharedVec<T> {}
 
 impl<T> Drop for SharedVec<T> {
     fn drop(&mut self) {
@@ -231,6 +232,7 @@ impl<T> Drop for SharedVecRef<T> {
 }
 
 unsafe impl<T: Sync> Send for SharedVecRef<T> {}
+unsafe impl<T: Sync> Sync for SharedVecRef<T> {}
 
 /// A container of a `Vec` allocation that can be split into multiple `SharedVecPart` values.
 ///
@@ -449,6 +451,7 @@ impl<T> SharedVecMut<T> {
 }
 
 unsafe impl<T: Send> Send for SharedVecMut<T> {}
+unsafe impl<T: Sync> Sync for SharedVecMut<T> {}
 
 impl<T> Drop for SharedVecMut<T> {
     fn drop(&mut self) {
@@ -527,3 +530,4 @@ impl<T> Drop for SharedVecPart<T> {
 }
 
 unsafe impl<T: Send> Send for SharedVecPart<T> {}
+unsafe impl<T: Sync> Sync for SharedVecPart<T> {}

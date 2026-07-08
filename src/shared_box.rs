@@ -147,6 +147,7 @@ impl<T> SharedBox<T> {
 }
 
 unsafe impl<T: Send> Send for SharedBox<T> {}
+unsafe impl<T: Sync> Sync for SharedBox<T> {}
 
 impl<T> Drop for SharedBox<T> {
     fn drop(&mut self) {
@@ -198,6 +199,7 @@ pub struct SharedBoxRef<T> {
 
 /// `SharedBoxRef` is like `&T`, which only requires `T: Sync` to implement `Send`.
 unsafe impl<T: Sync> Send for SharedBoxRef<T> {}
+unsafe impl<T: Sync> Sync for SharedBoxRef<T> {}
 
 impl<T> SharedBoxRef<T> {
     /// Example usage:

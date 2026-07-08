@@ -166,6 +166,11 @@ impl<T> Drop for SharedBox<T> {
 /// ```should_panic
 /// let mut b = manual_share::SharedBox::new(1);
 /// b.borrow();
+///
+/// // forget SharedBox to make sure the panic is not caused by dropping it first.
+/// std::mem::forget(b);
+///
+/// // panic here due to dropping SharedBoxRef
 /// ```
 ///
 /// Use `SharedBox::try_return` to consume it without causing panic.

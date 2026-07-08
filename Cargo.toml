@@ -1,0 +1,11 @@
+[package]
+name = "manual-share"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+
+[features]
+default = ["panic-on-drop", "do-not-panic-when-panicking"]
+panic-on-drop = []
+do-not-panic-when-panicking = ["panic-on-drop"]

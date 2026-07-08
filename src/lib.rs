@@ -22,19 +22,6 @@
 //!
 //! Users can enable **`panic-on-drop`** feature, so that whenever a leak happens, the thread panics to help users find the problem.
 //!
-//! The initial intention of this crate is to provide a safer way to the following unsafe pattern:
-//! ```
-//! let b = Box::new(0);
-//! let mut ptr = Box::into_raw(b);
-//!
-//! // Do something with ptr
-//!
-//! let b = unsafe { Box::from_raw(ptr) };
-//! drop(b);
-//! // This will free the memory,
-//! // but if the other thread is still using it, it will cause use-after-free.
-//! ```
-//!
 //! # Pros
 //! 1. Conversion between the original type and the shared type is copy free,
 //!    while conversion between [`std::sync::Arc`] and [`Box`] involves new allocation and copy.

@@ -58,8 +58,6 @@
 //!    which is not allowed for non-ZSTs.
 //! 2. Giving back more [`SharedBoxRef`] than what the original [`SharedBox`] has created will return an `Err` containing the [`SharedBoxRef`].
 //!
-//! The above behavior is also applied to [`SharedVec`] and [`SharedVecMut`].
-//!
 //! The above model for handling ZST originated from discussions in
 //! [a post in Rust user forum](https://users.rust-lang.org/t/built-a-crate-to-safely-share-box-and-vec-manually/141138/5).
 

@@ -117,7 +117,10 @@ impl<T> SharedVec<T> {
         }
 
         if size_of::<T>() == 0 {
-            // ZST types can have multiple allocations to the same address, so we need to check for overflow.
+            if self.len != reference.len {
+                return Err(reference);
+            }
+
             if let Some(new_count) = self.borrow_count.checked_sub(1) {
                 self.borrow_count = new_count;
                 let _ = core::mem::ManuallyDrop::new(reference);
@@ -283,10 +286,11 @@ pub struct SharedVecMut<T> {
     borrow_count: usize,
 
     ptr: *mut T,
+    len: usize,
     cap: usize,
 
-    start: usize,
-    len: usize,
+    remain_start: usize,
+    remain_len: usize,
 }
 
 impl<T> SharedVecMut<T> {
@@ -296,9 +300,10 @@ impl<T> SharedVecMut<T> {
         Self {
             borrow_count: 0,
             ptr,
-            cap,
-            start: 0,
             len,
+            cap,
+            remain_start: 0,
+            remain_len: len,
         }
     }
     /// Split off the suffix of the vector starting at `at`.
@@ -328,17 +333,17 @@ impl<T> SharedVecMut<T> {
     /// ```
     ///
     pub fn split_off(&mut self, at: usize) -> Option<SharedVecPart<T>> {
-        if at > self.len {
+        if at > self.remain_len {
             return None;
         }
         self.borrow_count = self.borrow_count.checked_add(1)?;
 
-        let last_len = self.len;
-        self.len = at;
+        let last_len = self.remain_len;
+        self.remain_len = at;
 
         Some(SharedVecPart {
             ptr: self.ptr,
-            start: self.start + at,
+            start: self.remain_start + at,
             len: last_len - at,
         })
     }
@@ -368,14 +373,14 @@ impl<T> SharedVecMut<T> {
     /// values.try_unsplit_to(part1).unwrap();
     /// ```
     pub fn split_to(&mut self, at: usize) -> Option<SharedVecPart<T>> {
-        if at > self.len {
+        if at > self.remain_len {
             return None;
         }
         self.borrow_count = self.borrow_count.checked_add(1)?;
 
-        let last_start = self.start;
-        self.start += at;
-        self.len -= at;
+        let last_start = self.remain_start;
+        self.remain_start += at;
+        self.remain_len -= at;
 
         Some(SharedVecPart {
             ptr: self.ptr,
@@ -388,11 +393,11 @@ impl<T> SharedVecMut<T> {
         if !core::ptr::eq(self.ptr, part.ptr) {
             return Err(part);
         }
-        if part.start != self.start + self.len {
+        if part.start != self.remain_start + self.remain_len {
             return Err(part);
         }
 
-        self.len += part.len;
+        self.remain_len += part.len;
 
         self.consume_part(part)
     }
@@ -401,12 +406,12 @@ impl<T> SharedVecMut<T> {
         if !core::ptr::eq(self.ptr, part.ptr) {
             return Err(part);
         }
-        if self.start != part.start + part.len {
+        if self.remain_start != part.start + part.len {
             return Err(part);
         }
 
-        self.start = part.start;
-        self.len += part.len;
+        self.remain_start = part.start;
+        self.remain_len += part.len;
 
         self.consume_part(part)
     }
@@ -426,20 +431,25 @@ impl<T> SharedVecMut<T> {
             Ok(())
         }
     }
+    fn can_convert_back(&self) -> bool {
+        self.borrow_count == 0
+            && self.remain_start == 0
+            && if size_of::<T>() == 0 {
+                self.remain_len == self.len
+            } else {
+                true
+            }
+    }
     /// Try to convert the mutable view back into a `Vec` when no parts remain outstanding.
     pub fn try_into_vec(self) -> Result<Vec<T>, Self> {
-        if self.borrow_count > 0 {
-            return Err(self);
+        if self.can_convert_back() {
+            let r = core::mem::ManuallyDrop::new(self);
+            let vec = unsafe { Vec::from_raw_parts(r.ptr, r.remain_len, r.cap) };
+
+            Ok(vec)
+        } else {
+            Err(self)
         }
-
-        if self.start != 0 {
-            return Err(self);
-        }
-
-        let r = core::mem::ManuallyDrop::new(self);
-        let vec = unsafe { Vec::from_raw_parts(r.ptr, r.len, r.cap) };
-
-        Ok(vec)
     }
     /// Directly get a slice of the remaining part of the `SharedVecMut`.
     /// ```
@@ -470,7 +480,7 @@ impl<T> SharedVecMut<T> {
         // The pointer is valid as long as the SharedVecMut is alive.
         // SharedVecPart cannot point to the same or overlapping region as self.
         // Also, splitting methods can't be called when the returned slice is alive.
-        unsafe { core::slice::from_raw_parts(self.ptr.add(self.start), self.len) }
+        unsafe { core::slice::from_raw_parts(self.ptr.add(self.remain_start), self.remain_len) }
     }
     /// Directly get a mutable slice of the remaining part of the `SharedVecMut`.
     pub fn as_slice_mut(&mut self) -> &mut [T] {
@@ -478,7 +488,7 @@ impl<T> SharedVecMut<T> {
         // The pointer is valid as long as the SharedVecMut is alive.
         // SharedVecPart cannot point to the same or overlapping region as self.
         // Also, splitting methods can't be called when the returned slice is alive.
-        unsafe { core::slice::from_raw_parts_mut(self.ptr.add(self.start), self.len) }
+        unsafe { core::slice::from_raw_parts_mut(self.ptr.add(self.remain_start), self.remain_len) }
     }
 }
 
@@ -499,12 +509,8 @@ impl<T> Drop for SharedVecMut<T> {
                 panic!("Dropping a SharedVecMut without giving back all SharedVecRef")
             }
         }
-        // Only drops when there are no outstanding SharedBoxRef values to prevent use-after-free.
-        if self.borrow_count == 0 {
-            // SAFETY:
-            // borrow_count == 0 implies there are no outstanding SharedVecPart values.
-            // Therefore this SharedVecMut again owns the entire allocation, so
-            // start == 0 and len is the original Vec length.
+
+        if self.can_convert_back() {
             unsafe {
                 drop(Vec::from_raw_parts(self.ptr, self.len, self.cap));
             }

@@ -135,6 +135,15 @@ impl<T> SharedBox<T> {
             Ok(unsafe { Box::from_raw(r.ptr) })
         }
     }
+    /// Directly get a reference to the value inside the `SharedBox`.
+    /// This use rust built-in lifetime check to ensure the reference is valid as long as the `SharedBox` is alive,
+    /// and has no runtime overhead.
+    pub fn get(&self) -> &T {
+        // SAFETY:
+        // The pointer is valid as long as the SharedBox is alive.
+        // All other references can only get immutable reference.
+        unsafe { &*self.ptr }
+    }
 }
 
 unsafe impl<T: Send> Send for SharedBox<T> {}
@@ -153,8 +162,11 @@ impl<T> Drop for SharedBox<T> {
                 panic!("Dropping a SharedBox without giving back all SharedBoxRef")
             }
         }
-        unsafe {
-            drop(Box::from_raw(self.ptr));
+        // Only drops when there are no outstanding SharedBoxRef values to prevent use-after-free.
+        if self.borrow_count == 0 {
+            unsafe {
+                drop(Box::from_raw(self.ptr));
+            }
         }
     }
 }

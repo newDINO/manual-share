@@ -4,7 +4,7 @@
 //! It owns the original allocation and lets you create multiple immutable `SharedVecRef`
 //! values that can be sent to other threads while keeping a single shared owner.
 //!
-//! The API is intentionally similar to `SharedBox`:
+//! The API is similar to `SharedBox`:
 //! - use `SharedVec::from_vec` to create a shared vector from a `Vec`
 //! - use `SharedVec::borrow` to create a `SharedVecRef`
 //! - use `SharedVec::try_return` to give a borrowed reference back
@@ -139,6 +139,15 @@ impl<T> SharedVec<T> {
             Ok(unsafe { Vec::from_raw_parts(r.ptr, r.len, r.cap) })
         }
     }
+    /// Directly get a slice to the values inside the `SharedVec`.
+    /// This use rust built-in lifetime check to ensure the slice is valid as long as the `SharedVec` is alive,
+    /// and has no runtime overhead.
+    pub fn get(&self) -> &[T] {
+        // SAFETY:
+        // The pointer is valid as long as the SharedVec is alive.
+        // All other references can only get immutable reference.
+        unsafe { core::slice::from_raw_parts(self.ptr, self.len) }
+    }
 }
 
 unsafe impl<T: Send> Send for SharedVec<T> {}
@@ -157,8 +166,11 @@ impl<T> Drop for SharedVec<T> {
                 panic!("Dropping a SharedVec without giving back all SharedVecRef")
             }
         }
-        unsafe {
-            drop(Vec::from_raw_parts(self.ptr, self.len, self.cap));
+        // Only drops when there are no outstanding SharedBoxRef values to prevent use-after-free.
+        if self.borrow_count == 0 {
+            unsafe {
+                drop(Vec::from_raw_parts(self.ptr, self.len, self.cap));
+            }
         }
     }
 }
@@ -395,6 +407,45 @@ impl<T> SharedVecMut<T> {
 
         Ok(vec)
     }
+    /// Directly get a slice of the remaining part of the `SharedVecMut`.
+    /// ```
+    /// let mut values = manual_share::SharedVecMut::from_vec(vec![1, 2, 3]);
+    ///
+    /// let part1 = values.split_to(1).unwrap();
+    /// let part2 = values.split_off(1).unwrap();
+    ///
+    /// assert_eq!(values.as_slice(), &[2]);
+    /// assert_eq!(part1.as_slice(), &[1]);
+    /// assert_eq!(part2.as_slice(), &[3]);
+    ///
+    /// values.try_unsplit_off(part2).unwrap();
+    /// values.try_unsplit_to(part1).unwrap();
+    /// assert_eq!(values.as_slice(), &[1, 2, 3]);
+    /// ```
+    ///
+    /// Further splitting is no longer possible as long as the returned slice is held alive:
+    /// ```compile_fail
+    /// let mut values = manual_share::SharedVecMut::from_vec(vec![1, 2, 3]);
+    /// let slice = values.as_slice();
+    /// let part = values.split_off(1).unwrap();
+    ///
+    /// println!("{:?}", slice);
+    /// ```
+    pub fn as_slice(&self) -> &[T] {
+        // SAFETY:
+        // The pointer is valid as long as the SharedVecMut is alive.
+        // SharedVecPart cannot point to the same or overlapping region as self.
+        // Also, splitting methods can't be called when the returned slice is alive.
+        unsafe { core::slice::from_raw_parts(self.ptr.add(self.start), self.len) }
+    }
+    /// Directly get a mutable slice of the remaining part of the `SharedVecMut`.
+    pub fn as_slice_mut(&mut self) -> &mut [T] {
+        // SAFETY:
+        // The pointer is valid as long as the SharedVecMut is alive.
+        // SharedVecPart cannot point to the same or overlapping region as self.
+        // Also, splitting methods can't be called when the returned slice is alive.
+        unsafe { core::slice::from_raw_parts_mut(self.ptr.add(self.start), self.len) }
+    }
 }
 
 unsafe impl<T: Send> Send for SharedVecMut<T> {}
@@ -413,8 +464,15 @@ impl<T> Drop for SharedVecMut<T> {
                 panic!("Dropping a SharedVecMut without giving back all SharedVecRef")
             }
         }
-        unsafe {
-            drop(Vec::from_raw_parts(self.ptr, self.len, self.cap));
+        // Only drops when there are no outstanding SharedBoxRef values to prevent use-after-free.
+        if self.borrow_count == 0 {
+            // SAFETY:
+            // borrow_count == 0 implies there are no outstanding SharedVecPart values.
+            // Therefore this SharedVecMut again owns the entire allocation, so
+            // start == 0 and len is the original Vec length.
+            unsafe {
+                drop(Vec::from_raw_parts(self.ptr, self.len, self.cap));
+            }
         }
     }
 }

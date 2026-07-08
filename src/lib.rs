@@ -8,7 +8,7 @@
 //!
 //! # Before using
 //! One should consider using built-in types like [`std::sync::Arc`], [`std::rc::Rc`],
-//! or other smart containers like `bytes::Bytes` or `arc-slice::ArcSlice`.
+//! or other smart containers like `bytes::Bytes` or `arc-slice::ArcSlice` (which provide similar functionality of [`SharedVec`] and [`SharedVecMut`]).
 //! These types use automatic resource management and are often easier to use.
 //!
 //! Also, sometimes rust built-in borrow checker is enough,

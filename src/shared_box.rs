@@ -73,9 +73,10 @@ impl<T> SharedBox<T> {
     }
 
     /// Create a `SharedBoxRef` and increase the borrow count.
+    /// # panics
+    /// Panics when borrow count overflows `usize`.
     pub fn borrow(&mut self) -> SharedBoxRef<T> {
-        // No overflow check is needed because creating more than `usize::MAX` SharedBoxRef is impossible.
-        self.borrow_count += 1;
+        self.borrow_count = self.borrow_count.checked_add(1).unwrap();
         SharedBoxRef { ptr: self.ptr }
     }
 

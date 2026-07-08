@@ -86,8 +86,11 @@ impl<T> SharedVec<T> {
     /// assert_eq!(reference.as_slice(), &[1, 2, 3]);
     /// values.try_return(reference).unwrap();
     /// ```
+    ///
+    /// # panics
+    /// Panics when borrow count overflows `usize`.
     pub fn borrow(&mut self) -> SharedVecRef<T> {
-        self.borrow_count += 1;
+        self.borrow_count = self.borrow_count.checked_add(1).unwrap();
         SharedVecRef {
             ptr: self.ptr,
             len: self.len,
@@ -290,6 +293,10 @@ impl<T> SharedVecMut<T> {
     /// Split off the suffix of the vector starting at `at`.
     /// This method is similar to `bytes::BytesMut::split_off`.
     ///
+    /// Returns None when:
+    /// 1. `at` is greater than the length of the vector.
+    /// 2. `borrow_count` overflows `usize`.
+    ///
     /// If successful, the returned part will contain [at, len) and self will contain [0, at).
     ///
     /// Here is an example of splitting a `SharedVecMut` into 3 parts:
@@ -313,7 +320,7 @@ impl<T> SharedVecMut<T> {
         if at > self.len {
             return None;
         }
-        self.borrow_count += 1;
+        self.borrow_count = self.borrow_count.checked_add(1)?;
 
         let last_len = self.len;
         self.len = at;
@@ -326,6 +333,10 @@ impl<T> SharedVecMut<T> {
     }
     /// Split off the prefix of the vector ending at `at`.
     /// This method is similar to `bytes::BytesMut::split_to`.
+    ///
+    /// Returns None when:
+    /// 1. `at` is greater than the length of the vector.
+    /// 2. `borrow_count` overflows `usize`.
     ///
     /// If successful, the returned part will contain [0, at) and self will contain [at, len).
     ///
@@ -349,7 +360,7 @@ impl<T> SharedVecMut<T> {
         if at > self.len {
             return None;
         }
-        self.borrow_count += 1;
+        self.borrow_count = self.borrow_count.checked_add(1)?;
 
         let last_start = self.start;
         self.start += at;

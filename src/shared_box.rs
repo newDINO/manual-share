@@ -51,7 +51,7 @@
 /// // Dropping SharedBox here will free the heap memory it owns. No panic will occur.
 /// ```
 #[derive(Debug)]
-pub struct SharedBox<T> {
+pub struct SharedBox<T: ?Sized> {
     borrow_count: usize,
     ptr: *mut T,
 }
@@ -63,7 +63,9 @@ impl<T> SharedBox<T> {
         let b = Box::new(value);
         Self::from_box(b)
     }
+}
 
+impl<T: ?Sized> SharedBox<T> {
     /// Create a `SharedBox` by consuming a `Box`.
     pub fn from_box(unique: Box<T>) -> Self {
         Self {
@@ -105,7 +107,7 @@ impl<T> SharedBox<T> {
             return Err(reference);
         }
 
-        if size_of::<T>() == 0 {
+        if size_of_val(unsafe { &*self.ptr }) == 0 {
             // ZST types can have multiple allocations to the same address, so we need to check for overflow.
             if let Some(new_count) = self.borrow_count.checked_sub(1) {
                 self.borrow_count = new_count;
@@ -163,7 +165,7 @@ unsafe impl<T: Send + Sync> Send for SharedBox<T> {}
 
 unsafe impl<T: Sync> Sync for SharedBox<T> {}
 
-impl<T> Drop for SharedBox<T> {
+impl<T: ?Sized> Drop for SharedBox<T> {
     fn drop(&mut self) {
         #[cfg(feature = "panic-on-drop")]
         {
@@ -207,7 +209,7 @@ impl<T> Drop for SharedBox<T> {
 /// b.try_return(r).unwrap();
 /// ```
 #[derive(Debug)]
-pub struct SharedBoxRef<T> {
+pub struct SharedBoxRef<T: ?Sized> {
     ptr: *const T,
 }
 
@@ -215,7 +217,7 @@ pub struct SharedBoxRef<T> {
 unsafe impl<T: Sync> Send for SharedBoxRef<T> {}
 unsafe impl<T: Sync> Sync for SharedBoxRef<T> {}
 
-impl<T> SharedBoxRef<T> {
+impl<T: ?Sized> SharedBoxRef<T> {
     /// Example usage:
     /// ```
     /// let mut b = manual_share::SharedBox::new(42);
@@ -243,7 +245,7 @@ impl<T> SharedBoxRef<T> {
     }
 }
 
-impl<T> Drop for SharedBoxRef<T> {
+impl<T: ?Sized> Drop for SharedBoxRef<T> {
     fn drop(&mut self) {
         #[cfg(feature = "panic-on-drop")]
         {

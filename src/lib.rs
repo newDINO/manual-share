@@ -68,7 +68,7 @@
 //!    can't be converted back to the original [`Vec`].
 //!
 //! The above model for handling ZST originated from discussions in
-//! [a post in Rust user forum](https://users.rust-lang.org/t/built-a-crate-to-safely-share-box-and-vec-manually/141138/5).
+//! [a post in Rust user forum](https://users.rust-lang.org/t/built-a-crate-to-safely-share-box-and-vec-manually).
 
 pub mod shared_box;
 pub mod shared_vec;

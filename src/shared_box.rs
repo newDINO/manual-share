@@ -160,7 +160,7 @@ impl<T: ?Sized> SharedBox<T> {
     }
 }
 
-/// See https://users.rust-lang.org/t/built-a-crate-to-safely-share-box-and-vec-manually/141138/25?u=newdino for why it require `Sync`.
+/// See <https://users.rust-lang.org/t/built-a-crate-to-safely-share-box-and-vec-manually/141138/25?u=newdino> for why it require `Sync`.
 unsafe impl<T: Send + Sync> Send for SharedBox<T> {}
 
 unsafe impl<T: Sync> Sync for SharedBox<T> {}

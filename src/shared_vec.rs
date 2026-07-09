@@ -593,6 +593,9 @@ mod test {
     }
 
     #[test]
+    fn zst_different_length() {}
+
+    #[test]
     fn mut_zst() {
         let mut b1: SharedVecMut<()> = SharedVecMut::from_vec(Vec::new());
         let mut b2: SharedVecMut<()> = SharedVecMut::from_vec(Vec::new());

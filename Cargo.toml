@@ -4,6 +4,7 @@ version = "0.1.1"
 edition = "2024"
 description = "Types to manually share Box and Vec"
 license = "MIT"
+repository = "https://github.com/newDINO/manual-share"
 
 [dependencies]
 

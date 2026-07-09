@@ -165,7 +165,7 @@ impl<T: ?Sized> SharedBox<T> {
     }
 }
 
-impl<T> Deref for SharedBox<T> {
+impl<T: ?Sized> Deref for SharedBox<T> {
     type Target = T;
     fn deref(&self) -> &Self::Target {
         self.get()
@@ -257,13 +257,6 @@ impl<T: ?Sized> SharedBoxRef<T> {
     }
 }
 
-impl<T> Deref for SharedBoxRef<T> {
-    type Target = T;
-    fn deref(&self) -> &Self::Target {
-        self.get()
-    }
-}
-
 impl<T: ?Sized> Drop for SharedBoxRef<T> {
     fn drop(&mut self) {
         #[cfg(feature = "panic-on-drop")]
@@ -276,6 +269,13 @@ impl<T: ?Sized> Drop for SharedBoxRef<T> {
 
             panic!("SharedBoxRef should not be dropped. Use SharedBox::try_return to consume it.");
         }
+    }
+}
+
+impl<T: ?Sized> Deref for SharedBoxRef<T> {
+    type Target = T;
+    fn deref(&self) -> &Self::Target {
+        self.get()
     }
 }
 

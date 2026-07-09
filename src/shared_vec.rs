@@ -37,6 +37,8 @@
 //! ```
 //!
 
+use std::ops::{Deref, DerefMut};
+
 /// A structure owning the original `Vec` which can be used to create multiple immutable
 /// `SharedVecRef` values to send to other threads.
 /// It uses a counter to record how many references have been created and not returned yet.
@@ -194,6 +196,13 @@ impl<T> Drop for SharedVec<T> {
     }
 }
 
+impl<T> Deref for SharedVec<T> {
+    type Target = [T];
+    fn deref(&self) -> &Self::Target {
+        self.get()
+    }
+}
+
 /// A reference to `SharedVec` that can be sent to other threads.
 ///
 /// Dropping a `SharedVecRef` leaks the heap allocation it points to.
@@ -251,6 +260,13 @@ impl<T> Drop for SharedVecRef<T> {
 
 unsafe impl<T: Sync + Send> Send for SharedVecRef<T> {}
 unsafe impl<T: Sync> Sync for SharedVecRef<T> {}
+
+impl<T> Deref for SharedVecRef<T> {
+    type Target = [T];
+    fn deref(&self) -> &Self::Target {
+        self.as_slice()
+    }
+}
 
 /// A container of a `Vec` allocation that can be split into multiple `SharedVecPart` values.
 ///
@@ -520,6 +536,19 @@ impl<T> Drop for SharedVecMut<T> {
     }
 }
 
+impl<T> Deref for SharedVecMut<T> {
+    type Target = [T];
+    fn deref(&self) -> &Self::Target {
+        self.as_slice()
+    }
+}
+
+impl<T> DerefMut for SharedVecMut<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.as_slice_mut()
+    }
+}
+
 /// A slice-like view into a segment of a `SharedVecMut` allocation.
 ///
 /// It can be read as a slice or mutated in place while the underlying allocation is still owned
@@ -571,6 +600,19 @@ impl<T> Drop for SharedVecPart<T> {
 
 unsafe impl<T: Send> Send for SharedVecPart<T> {}
 unsafe impl<T: Sync> Sync for SharedVecPart<T> {}
+
+impl<T> Deref for SharedVecPart<T> {
+    type Target = [T];
+    fn deref(&self) -> &Self::Target {
+        self.as_slice()
+    }
+}
+
+impl<T> DerefMut for SharedVecPart<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.as_slice_mut()
+    }
+}
 
 #[cfg(test)]
 mod test {

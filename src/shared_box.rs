@@ -25,6 +25,8 @@
 //! println!("{:?}", b);
 //! ```
 
+use std::ops::Deref;
+
 /// A structure owning the original `Box`
 /// which can be used to create multiple `SharedBoxRef` to send to other thread.
 /// It uses a counter to record the number of `SharedBoxRef` that has been created and not given back.
@@ -163,6 +165,13 @@ impl<T: ?Sized> SharedBox<T> {
     }
 }
 
+impl<T> Deref for SharedBox<T> {
+    type Target = T;
+    fn deref(&self) -> &Self::Target {
+        self.get()
+    }
+}
+
 /// See <https://users.rust-lang.org/t/built-a-crate-to-safely-share-box-and-vec-manually/141138/25?u=newdino> for why it require `Sync`.
 unsafe impl<T: Send + Sync> Send for SharedBox<T> {}
 
@@ -245,6 +254,13 @@ impl<T: ?Sized> SharedBoxRef<T> {
     /// ```
     pub fn get(&self) -> &T {
         unsafe { &*self.ptr }
+    }
+}
+
+impl<T> Deref for SharedBoxRef<T> {
+    type Target = T;
+    fn deref(&self) -> &Self::Target {
+        self.get()
     }
 }
 

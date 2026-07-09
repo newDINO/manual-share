@@ -42,7 +42,7 @@
 //! # Special ZST handling
 //! ZST (Zero-Sized Types) are types that have no size, such as `()` or `struct {}`.
 //! ZST allocated on heap can have the same address,
-//! so the ptr equallity check of returning methods such as [`SharedBox::try_return`]
+//! so the ptr equality check of returning methods such as [`SharedBox::try_return`]
 //! can't tell whether the [`SharedBoxRef`] has the same origin,
 //! allowing [`SharedBoxRef`] created by one [`SharedBox`] to be returned to a different [`SharedBox`].
 //!
@@ -53,10 +53,19 @@
 //! So an underflow check is added for ZST,
 //! giving back more [`SharedBoxRef`] will return an `Err` containing the [`SharedBoxRef`].
 //!
-//! User should be aware of the two difference of ZST compared to non-ZSTs:
+//! User should be aware of the difference behavior of ZST compared to non-ZSTs:
 //! 1. [`SharedBoxRef`] created by one [`SharedBox`] can be returned to a different [`SharedBox`],
 //!    which is not allowed for non-ZSTs.
+//!    However, for DST (Dynamically Sized Type), like `[T]` or `dyn Trait`, ptr equality also checks its metadata.
+//!    So ZSTs with different metadata still can't be return to the same [`SharedBox`].
 //! 2. Giving back more [`SharedBoxRef`] than what the original [`SharedBox`] has created will return an `Err` containing the [`SharedBoxRef`].
+//! 3. For ZST [`SharedVec`], there is an additional length check,
+//!    so [`SharedVecRef`] with different length can't be returned to the same [`SharedVec`].
+//! 4. For ZST [`SharedVecMut`], returning [`SharedVecPart`] originated from other [`SharedVecMut`]
+//!    can cause it to be in a state where its counter is 0,
+//!    but doesn't have the same length as the original [`Vec`].
+//!    So, a additional length check is added so that [`SharedVecMut`] of a different length
+//!    can't be converted back to the original [`Vec`].
 //!
 //! The above model for handling ZST originated from discussions in
 //! [a post in Rust user forum](https://users.rust-lang.org/t/built-a-crate-to-safely-share-box-and-vec-manually/141138/5).

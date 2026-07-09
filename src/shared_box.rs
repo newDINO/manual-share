@@ -163,6 +163,34 @@ impl<T: ?Sized> SharedBox<T> {
         // All other references can only get immutable reference.
         unsafe { &*self.ptr }
     }
+
+    /// Get a mutable reference if borrow count is 0.
+    /// ```
+    /// use manual_share::SharedBox;
+    ///
+    /// let mut b = SharedBox::new(0);
+    /// let r = b.borrow();
+    ///
+    /// assert!(b.get_mut().is_none());
+    ///
+    /// b.try_return(r).unwrap();
+    ///
+    /// let r = b.get_mut().unwrap();
+    /// *r += 1;
+    ///
+    /// assert_eq!(*b, 1);
+    /// ```
+    pub fn get_mut(&mut self) -> Option<&mut T> {
+        if self.borrow_count == 0 {
+            // SAFETY:
+            // The pointer is valid as long as the SharedBox is alive.
+            // And there is no other references.
+            let r = unsafe { &mut *self.ptr };
+            Some(r)
+        } else {
+            None
+        }
+    }
 }
 
 impl<T: ?Sized> Deref for SharedBox<T> {

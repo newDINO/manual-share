@@ -168,6 +168,35 @@ impl<T> SharedVec<T> {
         // All other references can only get immutable reference.
         unsafe { core::slice::from_raw_parts(self.ptr, self.len) }
     }
+
+    /// Get a mutable reference if borrow count is 0.
+    ///
+    /// ```
+    /// use manual_share::SharedVec;
+    ///
+    /// let mut b = SharedVec::from_vec(vec![0]);
+    /// let r = b.borrow();
+    ///
+    /// assert!(b.get_mut().is_none());
+    ///
+    /// b.try_return(r).unwrap();
+    ///
+    /// let r = b.get_mut().unwrap();
+    /// r[0] += 1;
+    ///
+    /// assert_eq!(b[0], 1);
+    /// ```
+    pub fn get_mut(&mut self) -> Option<&mut [T]> {
+        if self.borrow_count == 0 {
+            // SAFETY:
+            // The pointer is valid as long as the SharedVec is alive.
+            // And there is no other references.
+            let r = unsafe { core::slice::from_raw_parts_mut(self.ptr, self.len) };
+            Some(r)
+        } else {
+            None
+        }
+    }
 }
 
 unsafe impl<T: Send> Send for SharedVec<T> {}

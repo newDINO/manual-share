@@ -135,6 +135,7 @@ impl<T> SharedVec<T> {
         }
     }
     /// Try to convert `Self` into a `Vec` once all borrowed references are returned.
+    /// Note that the returned error type is `Self`, dropping it may cause panic.
     ///
     /// ```
     /// let mut values = manual_share::SharedVec::from_vec(vec![0]);
@@ -441,6 +442,7 @@ impl<T> SharedVecMut<T> {
             }
     }
     /// Try to convert the mutable view back into a `Vec` when no parts remain outstanding.
+    /// Note that the returned error type is `Self`, dropping it may cause panic.
     pub fn try_into_vec(self) -> Result<Vec<T>, Self> {
         if self.can_convert_back() {
             let r = core::mem::ManuallyDrop::new(self);

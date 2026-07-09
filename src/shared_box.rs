@@ -125,6 +125,8 @@ impl<T: ?Sized> SharedBox<T> {
 
     /// Try to convert `Self` into a `Box` if all borrowed `SharedBoxRef` has been given back.
     ///
+    /// Note that the returned error type is `Self`, dropping it may cause panic.
+    ///
     /// ```
     /// use manual_share::SharedBox;
     ///
@@ -141,6 +143,7 @@ impl<T: ?Sized> SharedBox<T> {
     /// let b = b.try_into_box().unwrap();
     /// assert_eq!(b, Box::new(0));
     /// ```
+    ///
     pub fn try_into_box(self) -> Result<Box<T>, Self> {
         if self.borrow_count > 0 {
             Err(self)

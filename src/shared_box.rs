@@ -281,4 +281,66 @@ mod test {
 
         b2.try_return(r12).unwrap();
     }
+    #[test]
+    fn zst_dyn_trait() {
+        // When comparing wide pointers, both the address and the metadata are tested for equality.
+        // It should become impossible to return a ZST ref with one vtable to another SharedBox.
+
+        trait T1 {
+            fn f(&self) -> u32;
+        }
+
+        struct A;
+        impl T1 for A {
+            fn f(&self) -> u32 {
+                0
+            }
+        }
+
+        struct B;
+        impl T1 for B {
+            fn f(&self) -> u32 {
+                1
+            }
+        }
+
+        let b1: Box<dyn T1> = Box::new(A);
+        let b2: Box<dyn T1> = Box::new(B);
+
+        let mut b1 = SharedBox::from_box(b1);
+        let mut b2 = SharedBox::from_box(b2);
+
+        let r1 = b1.borrow();
+        let r2 = b2.borrow();
+
+        assert_eq!(r1.get().f(), 0);
+        assert_eq!(r2.get().f(), 1);
+
+        let r2 = b1.try_return(r2).unwrap_err();
+        let r1 = b2.try_return(r1).unwrap_err();
+
+        assert!(b1.try_return(r1).is_ok());
+        assert!(b2.try_return(r2).is_ok());
+    }
+
+    #[test]
+    fn zst_slice() {
+        // When comparing wide pointers, both the address and the metadata are tested for equality.
+        // It should become impossible to return a ZST slice with one length to SharedBox with another length.
+
+        let b1: Box<[()]> = Box::new([(); 1]);
+        let b2: Box<[()]> = Box::new([(); 2]);
+
+        let mut b1 = SharedBox::from_box(b1);
+        let mut b2 = SharedBox::from_box(b2);
+
+        let r1 = b1.borrow();
+        let r2 = b2.borrow();
+
+        let r2 = b1.try_return(r2).unwrap_err();
+        let r1 = b2.try_return(r1).unwrap_err();
+
+        assert!(b1.try_return(r1).is_ok());
+        assert!(b2.try_return(r2).is_ok());
+    }
 }

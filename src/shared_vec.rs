@@ -593,7 +593,19 @@ mod test {
     }
 
     #[test]
-    fn zst_different_length() {}
+    fn zst_different_length() {
+        let mut b1 = SharedVec::from_vec(vec![()]);
+        let mut b2 = SharedVec::from_vec(vec![(), ()]);
+
+        let r1 = b1.borrow();
+        let r2 = b2.borrow();
+
+        let r2 = b1.try_return(r2).unwrap_err();
+        let r1 = b2.try_return(r1).unwrap_err();
+
+        b1.try_return(r1).unwrap();
+        b2.try_return(r2).unwrap();
+    }
 
     #[test]
     fn mut_zst() {
@@ -611,5 +623,26 @@ mod test {
         let r12 = b1.try_unsplit_off(r12).unwrap_err();
 
         b2.try_unsplit_off(r12).unwrap();
+    }
+
+    #[test]
+    fn mut_zst_different_length() {
+        let mut b1 = SharedVecMut::from_vec(vec![(), ()]);
+        let mut b2 = SharedVecMut::from_vec(vec![()]);
+
+        let r1 = b1.split_off(0).unwrap();
+        let r2 = b2.split_off(0).unwrap();
+
+        b1.try_unsplit_off(r2).unwrap();
+
+        let mut b1 = b1.try_into_vec().unwrap_err();
+
+        let r2 = b1.split_off(0).unwrap();
+
+        b1.try_unsplit_off(r1).unwrap();
+        b2.try_unsplit_off(r2).unwrap();
+
+        assert_eq!(b1.try_into_vec().unwrap(), [(), ()]);
+        assert_eq!(b2.try_into_vec().unwrap(), [()]);
     }
 }

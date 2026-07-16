@@ -1,3 +1,5 @@
+//! A convenient trait built on existing API.
+
 use crate::{SharedBox, SharedVec, SharedVecMut};
 
 /// # Examples:

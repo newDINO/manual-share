@@ -74,5 +74,5 @@ mod shared_box;
 pub use shared_box::{SharedBox, SharedBoxRef};
 mod shared_vec;
 pub use shared_vec::{SharedVec, SharedVecMut, SharedVecPart, SharedVecRef};
-mod scope;
-pub use scope::{Scope, VecShareMut};
+pub mod scope;
+pub use scope::Scope;

@@ -70,7 +70,9 @@
 //! The above model for handling ZST originated from discussions in
 //! [a post in Rust user forum](https://users.rust-lang.org/t/built-a-crate-to-safely-share-box-and-vec-manually).
 
-pub mod shared_box;
-pub mod shared_vec;
-pub use shared_box::*;
-pub use shared_vec::*;
+mod shared_box;
+pub use shared_box::{SharedBox, SharedBoxRef};
+mod shared_vec;
+pub use shared_vec::{SharedVec, SharedVecMut, SharedVecPart, SharedVecRef};
+mod scope;
+pub use scope::{Scope, VecShareMut};
